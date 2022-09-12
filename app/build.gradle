@@ -65,4 +65,7 @@ dependencies {
 
     //Icons
     implementation "androidx.compose.material:material-icons-extended:$compose_version"
+
+    //Insets
+    implementation "androidx.compose.foundation:foundation:$compose_version"
 }

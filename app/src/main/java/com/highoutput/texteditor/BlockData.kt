@@ -26,7 +26,7 @@ data class HeadingData(
 data class ListData(
     override var text: TextFieldValue? = null,
     val style: String = "unordered",
-    val items: List<TextFieldValue>
+    val items: List<ListItem>
 ) : Data()
 
 data class TodoListData(
@@ -37,5 +37,10 @@ data class TodoListData(
 data class TodoItem(
     val id: String = Random.nextInt(Integer.MAX_VALUE).toString(),
     val checked: Boolean = false,
+    val text: TextFieldValue = TextFieldValue()
+)
+
+data class ListItem(
+    val id: String = Random.nextInt(Integer.MAX_VALUE).toString(),
     val text: TextFieldValue = TextFieldValue()
 )
