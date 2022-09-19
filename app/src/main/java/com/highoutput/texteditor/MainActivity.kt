@@ -1,9 +1,13 @@
 package com.highoutput.texteditor
 
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -28,11 +32,10 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.*
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.*
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -42,7 +45,10 @@ import androidx.compose.ui.text.input.getTextBeforeSelection
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.view.WindowCompat
+import coil.ImageLoader
+import coil.compose.SubcomposeAsyncImage
+import coil.memory.MemoryCache
+import coil.request.ImageRequest
 import com.google.gson.Gson
 import com.highoutput.texteditor.ui.theme.TextEditorTheme
 import kotlinx.coroutines.launch
@@ -66,6 +72,7 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalComposeUiApi::class, ExperimentalMaterialApi::class)
 @Composable
 fun Greeting(name: String) {
+    val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     var currentIndexFocus by remember {
         mutableStateOf(-1)
@@ -78,9 +85,9 @@ fun Greeting(name: String) {
         mutableStateListOf(
             BlockData(
                 data = ParagraphData(
-                    text = TextFieldValue(""),
+                    textFieldValue = TextFieldValue(""),
                 )
-            ),
+            )
         )
     }
 
@@ -98,8 +105,7 @@ fun Greeting(name: String) {
 
     val backspace: (index: Int, event: KeyEvent) -> Boolean = { index, event ->
         if (event.key == Key.Backspace &&
-            blockData[index].data.text?.text?.isEmpty() == true &&
-            blockData.size > 1
+            blockData[index].data.textFieldValue?.text?.isEmpty() == true
         ) {
             blockData.removeAt(index)
             focusManager.moveFocus(FocusDirection.Up)
@@ -108,6 +114,24 @@ fun Greeting(name: String) {
             false
         }
     }
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent(),
+        onResult = { uri ->
+            val file = uri?.let {
+                FileHelper.fileFromContentUri(
+                    context = context,
+                    contentUri = it
+                )
+            }
+            addNewLine(
+                BlockOption.Image.type,
+                ImageData(
+                    file = file
+                )
+            )
+        },
+    )
 
     ModalBottomSheetLayout(
         sheetState = sheetState,
@@ -123,7 +147,7 @@ fun Greeting(name: String) {
                             addNewLine(
                                 BlockOption.Header.type,
                                 HeadingData(
-                                    text = TextFieldValue(""),
+                                    textFieldValue = TextFieldValue(""),
                                     level = 1,
                                 ),
                             )
@@ -136,7 +160,7 @@ fun Greeting(name: String) {
                             addNewLine(
                                 BlockOption.Header.type,
                                 HeadingData(
-                                    text = TextFieldValue(""),
+                                    textFieldValue = TextFieldValue(""),
                                     level = 2,
                                 ),
                             )
@@ -149,7 +173,7 @@ fun Greeting(name: String) {
                             addNewLine(
                                 BlockOption.Header.type,
                                 HeadingData(
-                                    text = TextFieldValue(""),
+                                    textFieldValue = TextFieldValue(""),
                                     level = 3,
                                 ),
                             )
@@ -162,7 +186,7 @@ fun Greeting(name: String) {
                             addNewLine(
                                 BlockOption.Header.type,
                                 HeadingData(
-                                    text = TextFieldValue(""),
+                                    textFieldValue = TextFieldValue(""),
                                     level = 4,
                                 ),
                             )
@@ -176,7 +200,7 @@ fun Greeting(name: String) {
                                 BlockOption.List.type,
                                 ListData(
                                     style = "unordered",
-                                    items = mutableListOf(
+                                    listItems = mutableListOf(
                                         ListItem(),
                                     )
                                 ),
@@ -190,7 +214,7 @@ fun Greeting(name: String) {
                             addNewLine(
                                 BlockOption.TodoList.type,
                                 TodoListData(
-                                    items = mutableListOf(
+                                    todoItems = mutableListOf(
                                         TodoItem()
                                     )
                                 ),
@@ -201,8 +225,18 @@ fun Greeting(name: String) {
                     }
                     Button(
                         onClick = {
+                            galleryLauncher.launch("image/*")
+                        },
+                    ) {
+                        Text("Image")
+                    }
+                    Button(
+                        onClick = {
+                            val format = blockData.map { block ->
+                                block.formatJson()
+                            }
                             val gson = Gson()
-                            val tutorials = gson.toJsonTree(blockData.toList())
+                            val tutorials = gson.toJsonTree(format.toList())
                             Log.d("JSON", "$tutorials")
                         },
                     ) {
@@ -224,11 +258,11 @@ fun Greeting(name: String) {
                             if (block != null) {
                                 when (block.type) {
                                     BlockOption.Paragraph.type -> {
-                                        if (block.data.text?.text?.isNotEmpty() == true) {
+                                        if (block.data.textFieldValue?.text?.isNotEmpty() == true) {
                                             addNewLine(
                                                 BlockOption.Paragraph.type,
                                                 ParagraphData(
-                                                    text = TextFieldValue("")
+                                                    textFieldValue = TextFieldValue("")
                                                 )
                                             )
                                         }
@@ -237,7 +271,7 @@ fun Greeting(name: String) {
                                         addNewLine(
                                             BlockOption.Paragraph.type,
                                             ParagraphData(
-                                                text = TextFieldValue("")
+                                                textFieldValue = TextFieldValue("")
                                             )
                                         )
                                     }
@@ -264,11 +298,11 @@ fun Greeting(name: String) {
                                                     }
                                                 },
                                             type = block.type,
-                                            value = block.data.text ?: TextFieldValue(""),
+                                            value = block.data.textFieldValue ?: TextFieldValue(""),
                                             onValueChange = {
                                                 blockData[blockIndex] = block.copy(
                                                     data = HeadingData(
-                                                        text = it,
+                                                        textFieldValue = it,
                                                         level = 1,
                                                     )
                                                 )
@@ -281,7 +315,7 @@ fun Greeting(name: String) {
                                                 addNewLine(
                                                     BlockOption.Paragraph.type,
                                                     ParagraphData(
-                                                        text = TextFieldValue(""),
+                                                        textFieldValue = TextFieldValue(""),
                                                     ),
                                                 )
                                             },
@@ -295,11 +329,11 @@ fun Greeting(name: String) {
                                                     backspace(blockIndex, event)
                                                 },
                                             type = block.type,
-                                            value = block.data.text ?: TextFieldValue(""),
+                                            value = block.data.textFieldValue ?: TextFieldValue(""),
                                             onValueChange = {
                                                 blockData[blockIndex] = block.copy(
                                                     data = HeadingData(
-                                                        text = it,
+                                                        textFieldValue = it,
                                                         level = 2,
                                                     )
                                                 )
@@ -312,7 +346,7 @@ fun Greeting(name: String) {
                                                 addNewLine(
                                                     BlockOption.Paragraph.type,
                                                     ParagraphData(
-                                                        text = TextFieldValue(""),
+                                                        textFieldValue = TextFieldValue(""),
                                                     ),
                                                 )
                                             },
@@ -326,11 +360,11 @@ fun Greeting(name: String) {
                                                     backspace(blockIndex, event)
                                                 },
                                             type = block.type,
-                                            value = block.data.text ?: TextFieldValue(""),
+                                            value = block.data.textFieldValue ?: TextFieldValue(""),
                                             onValueChange = {
                                                 blockData[blockIndex] = block.copy(
                                                     data = HeadingData(
-                                                        text = it,
+                                                        textFieldValue = it,
                                                         level = 3,
                                                     )
                                                 )
@@ -343,7 +377,7 @@ fun Greeting(name: String) {
                                                 addNewLine(
                                                     BlockOption.Paragraph.type,
                                                     ParagraphData(
-                                                        text = TextFieldValue(""),
+                                                        textFieldValue = TextFieldValue(""),
                                                     ),
                                                 )
                                             },
@@ -357,11 +391,11 @@ fun Greeting(name: String) {
                                                     backspace(blockIndex, event)
                                                 },
                                             type = block.type,
-                                            value = block.data.text ?: TextFieldValue(""),
+                                            value = block.data.textFieldValue ?: TextFieldValue(""),
                                             onValueChange = {
                                                 blockData[blockIndex] = block.copy(
                                                     data = HeadingData(
-                                                        text = it,
+                                                        textFieldValue = it,
                                                         level = 4,
                                                     )
                                                 )
@@ -374,7 +408,7 @@ fun Greeting(name: String) {
                                                 addNewLine(
                                                     BlockOption.Paragraph.type,
                                                     ParagraphData(
-                                                        text = TextFieldValue(""),
+                                                        textFieldValue = TextFieldValue(""),
                                                     ),
                                                 )
                                             },
@@ -394,14 +428,14 @@ fun Greeting(name: String) {
                                                 currentIndexFocus = blockIndex
                                             }
                                         },
-                                    value = block.data.text ?: TextFieldValue(""),
+                                    value = block.data.textFieldValue ?: TextFieldValue(""),
                                     onValueChange = {
                                         if (it.text.startsWith("- ")) {
                                             blockData[blockIndex] = block.copy(
                                                 type = BlockOption.List.type,
                                                 data = ListData(
                                                     style = "unordered",
-                                                    items = mutableListOf(
+                                                    listItems = mutableListOf(
                                                         ListItem(),
                                                     )
                                                 )
@@ -409,7 +443,7 @@ fun Greeting(name: String) {
                                         } else {
                                             blockData[blockIndex] = block.copy(
                                                 data = ParagraphData(
-                                                    text = it,
+                                                    textFieldValue = it,
                                                 )
                                             )
                                         }
@@ -421,7 +455,7 @@ fun Greeting(name: String) {
                                         addNewLine(
                                             BlockOption.Paragraph.type,
                                             ParagraphData(
-                                                text = TextFieldValue(""),
+                                                textFieldValue = TextFieldValue(""),
                                             ),
                                         )
                                     },
@@ -430,7 +464,7 @@ fun Greeting(name: String) {
                             BlockOption.List.type -> {
                                 val listData = block.data as ListData
                                 Column {
-                                    listData.items.forEachIndexed { itemIndex, item ->
+                                    listData.listItems?.forEachIndexed { itemIndex, item ->
                                         CustomTextField(
                                             modifier = Modifier
                                                 .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -440,18 +474,19 @@ fun Greeting(name: String) {
                                                         event.key == Key.Backspace &&
                                                         item.text.text.isEmpty()
                                                     ) {
-                                                        if (listData.items.size == 1) {
+                                                        if (listData.listItems.size == 1) {
                                                             blockData.removeAt(blockIndex)
                                                         } else {
                                                             blockData[blockIndex] = block.copy(
                                                                 data = listData.copy(
-                                                                    items = listData.items - listData.items[itemIndex]
+                                                                    listItems = listData.listItems - listData.listItems[itemIndex]
                                                                 )
                                                             )
                                                             addNewLine(
                                                                 BlockOption.Paragraph.type,
                                                                 ParagraphData(
-                                                                    text = TextFieldValue("")
+                                                                    textFieldValue = TextFieldValue(
+                                                                        "")
                                                                 )
                                                             )
                                                         }
@@ -471,19 +506,19 @@ fun Greeting(name: String) {
                                                 val listItem = ListItem()
                                                 blockData[blockIndex] = block.copy(
                                                     data = listData.copy(
-                                                        items = listData.items + listItem,
+                                                        listItems = listData.listItems + listItem,
                                                     )
                                                 )
                                             },
                                             onValueChange = { text ->
                                                 val newItems =
-                                                    listData.items.mapButReplace(
-                                                        listData.items[itemIndex],
+                                                    listData.listItems.mapButReplace(
+                                                        listData.listItems[itemIndex],
                                                         item.copy(text = text),
                                                     )
                                                 blockData[blockIndex] = block.copy(
                                                     data = listData.copy(
-                                                        items = newItems
+                                                        listItems = newItems
                                                     )
                                                 )
                                             },
@@ -498,7 +533,7 @@ fun Greeting(name: String) {
                             BlockOption.TodoList.type -> {
                                 val todoListData = block.data as TodoListData
                                 Column {
-                                    todoListData.items.forEachIndexed { itemIndex, item ->
+                                    todoListData.todoItems?.forEachIndexed { itemIndex, item ->
                                         CustomTextField(
                                             modifier = Modifier
                                                 .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -508,12 +543,12 @@ fun Greeting(name: String) {
                                                         event.key == Key.Backspace &&
                                                         item.text.text.isEmpty()
                                                     ) {
-                                                        if (todoListData.items.size == 1) {
+                                                        if (todoListData.todoItems.size == 1) {
                                                             blockData.removeAt(blockIndex)
                                                         } else {
                                                             blockData[blockIndex] = block.copy(
                                                                 data = todoListData.copy(
-                                                                    items = todoListData.items - item
+                                                                    todoItems = todoListData.todoItems - item
                                                                 )
                                                             )
                                                         }
@@ -533,19 +568,19 @@ fun Greeting(name: String) {
                                                 val newItem = TodoItem()
                                                 blockData[blockIndex] = block.copy(
                                                     data = todoListData.copy(
-                                                        items = todoListData.items + newItem
+                                                        todoItems = todoListData.todoItems + newItem
                                                     )
                                                 )
                                             },
                                             onValueChange = { text ->
                                                 val newItems =
-                                                    todoListData.items.mapButReplace(
-                                                        todoListData.items[itemIndex],
+                                                    todoListData.todoItems.mapButReplace(
+                                                        todoListData.todoItems[itemIndex],
                                                         item.copy(text = text),
                                                     )
                                                 blockData[blockIndex] = block.copy(
                                                     data = todoListData.copy(
-                                                        items = newItems
+                                                        todoItems = newItems
                                                     )
                                                 )
                                             },
@@ -554,13 +589,13 @@ fun Greeting(name: String) {
                                                     checked = item.checked,
                                                     onCheckedChange = { checked ->
                                                         val newItems =
-                                                            todoListData.items.mapButReplace(
-                                                                todoListData.items[itemIndex],
+                                                            todoListData.todoItems.mapButReplace(
+                                                                todoListData.todoItems[itemIndex],
                                                                 item.copy(checked = checked),
                                                             )
                                                         blockData[blockIndex] = block.copy(
                                                             data = todoListData.copy(
-                                                                items = newItems
+                                                                todoItems = newItems
                                                             )
                                                         )
                                                     },
@@ -570,6 +605,10 @@ fun Greeting(name: String) {
                                     }
                                 }
                             }
+                            BlockOption.Image.type -> {
+                                val imageData = block.data as ImageData
+                                RenderPhoto(url = imageData.file)
+                            }
                         }
                     }
                 }
@@ -577,11 +616,11 @@ fun Greeting(name: String) {
                 ) {
                     TextButton(
                         onClick = {
-                            blockData[currentIndexFocus].data.text?.let {
+                            blockData[currentIndexFocus].data.textFieldValue?.let {
                                 blockData[currentIndexFocus] =
                                     blockData[currentIndexFocus].copy(
                                         data = ParagraphData(
-                                            text = changeToBold(it)
+                                            textFieldValue = changeToBold(it)
                                         )
                                     )
                             }
@@ -591,11 +630,11 @@ fun Greeting(name: String) {
                     }
                     TextButton(
                         onClick = {
-                            blockData[currentIndexFocus].data.text?.let {
+                            blockData[currentIndexFocus].data.textFieldValue?.let {
                                 blockData[currentIndexFocus] =
                                     blockData[currentIndexFocus].copy(
                                         data = ParagraphData(
-                                            text = changeToItalic(it),
+                                            textFieldValue = changeToItalic(it),
                                         )
                                     )
                             }
@@ -682,7 +721,10 @@ private fun changeToBold(textFVal: TextFieldValue): TextFieldValue {
         fontWeight = FontWeight.Bold,
     )
     txtAnnotatedBuilder.addStyle(myStyle, realStartIndex, endIndex)
-    return textFVal.copy(annotatedString = txtAnnotatedBuilder.toAnnotatedString())
+    return textFVal.copy(
+        annotatedString = txtAnnotatedBuilder.toAnnotatedString(),
+        selection = TextRange(realStartIndex, endIndex),
+    )
 }
 
 private fun changeToItalic(textFVal: TextFieldValue): TextFieldValue {
@@ -697,6 +739,39 @@ private fun changeToItalic(textFVal: TextFieldValue): TextFieldValue {
     return textFVal.copy(annotatedString = txtAnnotatedBuilder.toAnnotatedString())
 }
 
+@Composable
+fun RenderPhoto(
+    url: Any?,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop,
+) {
+    val context = LocalContext.current
+    val imageLoader = ImageLoader.Builder(context)
+        .memoryCache {
+            MemoryCache.Builder(context)
+                .maxSizePercent(0.50)
+                .build()
+        }
+        .build()
+
+    SubcomposeAsyncImage(
+        model = ImageRequest.Builder(context)
+            .data(url)
+            .crossfade(true)
+            .build(),
+        loading = {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(color = Color.LightGray),
+            )
+        },
+        imageLoader = imageLoader,
+        contentDescription = "",
+        contentScale = contentScale,
+        modifier = modifier
+    )
+}
 
 @Preview(showBackground = true)
 @Composable
