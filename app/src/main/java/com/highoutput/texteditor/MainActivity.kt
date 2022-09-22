@@ -1,6 +1,5 @@
 package com.highoutput.texteditor
 
-import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -103,17 +102,20 @@ fun Greeting(name: String) {
         }
     }
 
-    val backspace: (index: Int, event: KeyEvent) -> Boolean = { index, event ->
-        if (event.key == Key.Backspace &&
-            blockData[index].data.textFieldValue?.text?.isEmpty() == true
-        ) {
-            blockData.removeAt(index)
-            focusManager.moveFocus(FocusDirection.Up)
-            true
-        } else {
-            false
+    val backspace: (type: String, blockIndex: Int, event: KeyEvent) -> Boolean =
+        { type, blockIndex, event ->
+            if (event.key == Key.Backspace &&
+                blockData[blockIndex].data.textFieldValue?.text?.isEmpty() == true
+            ) {
+                if (blockData.size > 1) {
+                    blockData.removeAt(blockIndex)
+                }
+                focusManager.moveFocus(FocusDirection.Up)
+                true
+            } else {
+                false
+            }
         }
-    }
 
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
@@ -290,7 +292,7 @@ fun Greeting(name: String) {
                                             modifier = Modifier
                                                 .padding(horizontal = 16.dp, vertical = 8.dp)
                                                 .onKeyEvent { event ->
-                                                    backspace(blockIndex, event)
+                                                    backspace(block.type, blockIndex, event)
                                                 }
                                                 .onFocusChanged {
                                                     if (it.hasFocus) {
@@ -326,7 +328,7 @@ fun Greeting(name: String) {
                                             modifier = Modifier
                                                 .padding(horizontal = 16.dp, vertical = 8.dp)
                                                 .onKeyEvent { event ->
-                                                    backspace(blockIndex, event)
+                                                    backspace(block.type, blockIndex, event)
                                                 },
                                             type = block.type,
                                             value = block.data.textFieldValue ?: TextFieldValue(""),
@@ -357,7 +359,7 @@ fun Greeting(name: String) {
                                             modifier = Modifier
                                                 .padding(horizontal = 16.dp, vertical = 8.dp)
                                                 .onKeyEvent { event ->
-                                                    backspace(blockIndex, event)
+                                                    backspace(block.type, blockIndex, event)
                                                 },
                                             type = block.type,
                                             value = block.data.textFieldValue ?: TextFieldValue(""),
@@ -388,7 +390,7 @@ fun Greeting(name: String) {
                                             modifier = Modifier
                                                 .padding(horizontal = 16.dp, vertical = 8.dp)
                                                 .onKeyEvent { event ->
-                                                    backspace(blockIndex, event)
+                                                    backspace(block.type, blockIndex, event)
                                                 },
                                             type = block.type,
                                             value = block.data.textFieldValue ?: TextFieldValue(""),
@@ -421,7 +423,7 @@ fun Greeting(name: String) {
                                     modifier = Modifier
                                         .padding(horizontal = 16.dp, vertical = 8.dp)
                                         .onKeyEvent { event ->
-                                            backspace(blockIndex, event)
+                                            backspace(block.type, blockIndex, event)
                                         }
                                         .onFocusChanged {
                                             if (it.hasFocus) {
@@ -470,8 +472,7 @@ fun Greeting(name: String) {
                                                 .padding(horizontal = 16.dp, vertical = 8.dp)
                                                 .fillMaxWidth()
                                                 .onKeyEvent { event ->
-                                                    if (event.type == KeyEventType.KeyUp &&
-                                                        event.key == Key.Backspace &&
+                                                    if (event.key == Key.Backspace &&
                                                         item.text.text.isEmpty()
                                                     ) {
                                                         if (listData.listItems.size == 1) {
@@ -482,13 +483,7 @@ fun Greeting(name: String) {
                                                                     listItems = listData.listItems - listData.listItems[itemIndex]
                                                                 )
                                                             )
-                                                            addNewLine(
-                                                                BlockOption.Paragraph.type,
-                                                                ParagraphData(
-                                                                    textFieldValue = TextFieldValue(
-                                                                        "")
-                                                                )
-                                                            )
+                                                            focusManager.moveFocus(FocusDirection.Up)
                                                         }
                                                         true
                                                     } else {
@@ -551,8 +546,8 @@ fun Greeting(name: String) {
                                                                     todoItems = todoListData.todoItems - item
                                                                 )
                                                             )
+                                                            focusManager.moveFocus(FocusDirection.Up)
                                                         }
-                                                        focusManager.moveFocus(FocusDirection.Up)
                                                         true
                                                     } else {
                                                         false
